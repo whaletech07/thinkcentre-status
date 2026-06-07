@@ -1,0 +1,123 @@
+name: Incident Editor
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Create or resolve"
+        required: true
+        type: choice
+        options: [Create, Resolve]
+
+      id:
+        description: "Incident (resolve)"
+        required: false
+
+      title:
+        description: "Title (create)"
+        required: false
+
+      description:
+        description: "Description (create)"
+        required: false
+
+      severity:
+        description: "Severity"
+        required: false
+        type: choice
+        options: [degraded, critical]
+
+      services:
+        description: "Services (comma-separated, create)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  manual:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync state
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Prepare
+        run: |
+          mkdir -p output
+          [ -f output/incidents.json ] || echo "[]" > output/incidents.json
+
+      - name: Add/edit incident
+        run: |
+          set -euo pipefail
+
+          FILE=output/incidents.json
+
+          ACTION="$(echo "${{ github.event.inputs.action }}" | tr '[:upper:]' '[:lower:]')"
+          TITLE="${{ github.event.inputs.title }}"
+          DESC="${{ github.event.inputs.description }}"
+          SEVERITY="${{ github.event.inputs.severity }}"
+          SERVICES="${{ github.event.inputs.services }}"
+
+          if [ "$ACTION" = "create" ]; then
+
+            if [ -z "$TITLE" ]; then
+              echo "Title is required"
+              exit 1
+            fi
+
+            ID="$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')-$(date -u +%s)"
+
+            if [ -z "$SERVICES" ]; then
+              SERVICES_JSON="[]"
+            else
+              SERVICES_JSON=$(echo "$SERVICES" | tr ',' '\n' | jq -R . | jq -s .)
+            fi
+
+            jq --arg id "$ID" \
+               --arg title "$TITLE" \
+               --arg desc "$DESC" \
+               --arg severity "$SEVERITY" \
+               --arg time "$(date -u +"%Y-%m-%d %H:%M:%S UTC")" \
+               --argjson services "$SERVICES_JSON" '
+              [{
+                id: $id,
+                title: $title,
+                description: $desc,
+                severity: $severity,
+                services: $services,
+                status: "ongoing",
+                time: $time,
+                auto: false
+              }] + .
+            ' "$FILE" > tmp.json && mv tmp.json "$FILE"
+
+          fi
+
+          if [ "$ACTION" = "resolve" ]; then
+
+            jq --arg id "${{ github.event.inputs.id }}" '
+              map(
+                if .id == $id and .status != "resolved" then
+                  .status = "resolved"
+                else
+                  .
+                end
+              )
+            ' "$FILE" > tmp.json && mv tmp.json "$FILE"
+
+          fi
+
+      - name: Commit
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add output/incidents.json
+          git commit -m "Manual incident update" || exit 0
+          git push
