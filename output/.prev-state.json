@@ -1,0 +1,14 @@
+{
+  "dns": "UP",
+  "home": "UP",
+  "services": {
+    "mc": "UP",
+    "files": "UP",
+    "git": "UP",
+    "matrix": "UP",
+    "mast": "UP",
+    "navidrome": "UP",
+    "tools": "UP",
+    "legacy": "UP"
+  }
+}
