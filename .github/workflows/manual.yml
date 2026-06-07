@@ -54,8 +54,20 @@ jobs:
           [ -f output/incidents.json ] || echo "[]" > output/incidents.json
 
       - name: Add/edit incident
+        env:
+            DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           set -euo pipefail
+
+          notify_discord() {
+            local message="$1"
+
+            curl -fsS \
+                -H "Content-Type: application/json" \
+                -X POST \
+                -d "$(jq -nc --arg m "$message" '{content:$m}')" \
+                "$DISCORD_WEBHOOK" >/dev/null
+            }
 
           FILE=output/incidents.json
 
@@ -100,6 +112,10 @@ jobs:
 
           fi
 
+          MESSAGE="Service $s went DOWN"
+
+          notify_discord "$MESSAGE"
+
           if [ "$ACTION" = "resolve" ]; then
 
             jq --arg id "${{ github.event.inputs.id }}" '
@@ -111,6 +127,10 @@ jobs:
                 end
               )
             ' "$FILE" > tmp.json && mv tmp.json "$FILE"
+
+            MESSAGE="Service $s is back UP"
+
+            notify_discord "$MESSAGE"
 
           fi
 

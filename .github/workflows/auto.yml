@@ -23,10 +23,45 @@ jobs:
           git reset --hard origin/main
 
       - name: Monitor
+        env:
+            DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+            RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+            ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
         run: |
           # i have no idea what im doing
 
           set -euo pipefail # "Remember to set -euo pipefail, because Bash will take any oppourtinuty to delete your whole computer." -some youtuber
+
+          notify_discord() {
+            local message="$1"
+
+            curl -fsS \
+                -H "Content-Type: application/json" \
+                -X POST \
+                -d "$(jq -nc --arg m "$message" '{content:$m}')" \
+                "$DISCORD_WEBHOOK" >/dev/null
+            }
+
+            notify_email() {
+            local subject="$1"
+            local body="$2"
+
+            curl -fsS https://api.resend.com/emails \
+                -H "Authorization: Bearer $RESEND_API_KEY" \
+                -H "Content-Type: application/json" \
+                -d "$(jq -nc \
+                --arg from "status@whalete.ch" \
+                --arg to "$ALERT_EMAIL" \
+                --arg subject "$subject" \
+                --arg text "$body" \
+                '{
+                    from:$from,
+                    to:[$to],
+                    subject:$subject,
+                    text:$text
+                }'
+                )" >/dev/null
+            }
 
           mkdir -p output
 
@@ -109,6 +144,15 @@ jobs:
                   auto: true
                 }] + .
               ' "$INCIDENTS" > tmp.json && mv tmp.json "$INCIDENTS"
+
+            MESSAGE="Service $s went DOWN"
+
+            notify_discord "$MESSAGE"
+
+            notify_email \
+            "ThinkCentre Alert: $s DOWN" \
+            "$MESSAGE"
+
             fi
 
             # If up, resolve incident.
@@ -123,6 +167,15 @@ jobs:
                   end
                 )
               ' "$INCIDENTS" > tmp.json && mv tmp.json "$INCIDENTS"
+
+            MESSAGE="Service $s is back UP"
+
+            notify_discord "$MESSAGE"
+
+            notify_email \
+            "ThinkCentre Alert: $s UP" \
+            "$MESSAGE"
+
             fi
 
           done
