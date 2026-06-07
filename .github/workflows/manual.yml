@@ -112,7 +112,7 @@ jobs:
 
           fi
 
-          MESSAGE="Service $s went DOWN"
+          MESSAGE="New incident! '$TITLE'"
 
           notify_discord "$MESSAGE"
 
@@ -128,7 +128,7 @@ jobs:
               )
             ' "$FILE" > tmp.json && mv tmp.json "$FILE"
 
-            MESSAGE="Service $s is back UP"
+            MESSAGE="Incident resolved. '$TITLE'"
 
             notify_discord "$MESSAGE"
 
