@@ -110,11 +110,18 @@ jobs:
               }] + .
             ' "$FILE" > tmp.json && mv tmp.json "$FILE"
 
+            INCIDENT_TITLE=$(
+                jq -r \
+                    --arg id "${{ github.event.inputs.id }}" \
+                    '.[] | select(.id == $id) | .title' \
+                    "$FILE"
+                )
+
+            MESSAGE="New incident! '$INCIDENT_TITLE'"
+
+            notify_discord "$MESSAGE"
+
           fi
-
-          MESSAGE="New incident! '$TITLE'"
-
-          notify_discord "$MESSAGE"
 
           if [ "$ACTION" = "resolve" ]; then
 
