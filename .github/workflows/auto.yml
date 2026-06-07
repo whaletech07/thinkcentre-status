@@ -1,0 +1,144 @@
+name: Automatic Status Checker
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  auto:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync state
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Monitor
+        run: |
+          # i have no idea what im doing
+
+          set -euo pipefail # "Remember to set -euo pipefail, because Bash will take any oppourtinuty to delete your whole computer." -some youtuber
+
+          mkdir -p output
+
+          INCIDENTS=output/incidents.json
+
+          [ -f "$INCIDENTS" ] || echo "[]" > "$INCIDENTS"
+
+          check () {
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$1")
+            [[ "$code" =~ ^[23] ]] && echo "UP" || echo "DOWN"
+          }
+
+          # DNS check
+          DNS_IP=$(nslookup whaletech07.ddns.net 2>/dev/null | awk '/Address: / {print $2}' | tail -n 1)
+          [ -n "$DNS_IP" ] && DNS="UP" || DNS="DOWN"
+
+          # Home check
+          if [ "$DNS" = "UP" ]; then
+            HOME=$(check https://whaletech07.ddns.net/ping)
+          else
+            HOME="DOWN"
+          fi
+
+          # Services
+          if [ "$HOME" = "UP" ]; then
+            MC=$(check https://mc.whalete.ch)
+            FILES=$(check https://files.whalete.ch)
+            GIT=$(check https://git.whalete.ch)
+            MATRIX=$(check https://matrix.whalete.ch)
+            MAST=$(check https://mast.whalete.ch)
+            NAVIDROME=$(check https://navidrome.whalete.ch)
+            TOOLS=$(check https://tools.whalete.ch)
+            LEGACY=$(check https://legacy.whalete.ch)
+          else
+            MC=DOWN FILES=DOWN GIT=DOWN MATRIX=DOWN MAST=DOWN NAVIDROME=DOWN TOOLS=DOWN LEGACY=DOWN
+          fi
+
+          CURRENT=$(cat <<EOF
+          {
+            "dns": "$DNS",
+            "home": "$HOME",
+            "services": {
+              "mc": "$MC",
+              "files": "$FILES",
+              "git": "$GIT",
+              "matrix": "$MATRIX",
+              "mast": "$MAST",
+              "navidrome": "$NAVIDROME",
+              "tools": "$TOOLS",
+              "legacy": "$LEGACY"
+            }
+          }
+          EOF
+          )
+
+          PREV_STATE_FILE="output/.prev-state.json"
+          [ -f "$PREV_STATE_FILE" ] || echo '{"services":{}}' > "$PREV_STATE_FILE"
+
+          LAST_DATA=$(cat "$PREV_STATE_FILE")
+
+          for s in $(echo "$CURRENT" | jq -r '.services | keys[]'); do
+
+            CUR=$(echo "$CURRENT" | jq -r ".services.\"$s\"")
+            PREV=$(echo "$LAST_DATA" | jq -r ".services.\"$s\" // \"UP\"")
+
+            # If down, create incident.
+            if [ "$CUR" = "DOWN" ] && [ "$PREV" != "DOWN" ]; then
+
+              ID="$s-$(date -u +%s)"
+
+              jq --arg id "$ID" --arg s "$s" --arg t "$(date -u +"%Y-%m-%d %H:%M:%S UTC")" '
+                [{
+                  id: $id,
+                  title: ($s + " outage"),
+                  description: ("Service " + $s + " went DOWN"),
+                  severity: "critical",
+                  services: [$s],
+                  status: "ongoing",
+                  time: $t,
+                  auto: true
+                }] + .
+              ' "$INCIDENTS" > tmp.json && mv tmp.json "$INCIDENTS"
+            fi
+
+            # If up, resolve incident.
+            if [ "$CUR" = "UP" ] && [ "$PREV" = "DOWN" ]; then
+
+              jq --arg s "$s" '
+                map(
+                  if (.services | index($s)) and .status == "ongoing" then
+                    .status = "resolved"
+                  else
+                    .
+                  end
+                )
+              ' "$INCIDENTS" > tmp.json && mv tmp.json "$INCIDENTS"
+            fi
+
+          done
+
+          echo "$CURRENT" > "$PREV_STATE_FILE"
+
+      - name: Commit
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+
+          git add output/
+
+          git commit -m "Auto monitoring update" || exit 0
+
+          git fetch origin main
+          git rebase origin/main || true
+
+          git push origin main
