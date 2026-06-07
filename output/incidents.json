@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "test-incident-1780843196",
+    "title": "Test incident",
+    "description": "Test incident. Nothing is actually down. Disregard.",
+    "severity": "critical",
+    "services": [
+      "files"
+    ],
+    "status": "ongoing",
+    "time": "2026-06-07 14:39:56 UTC",
+    "auto": false
+  }
+]
