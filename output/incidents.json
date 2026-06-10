@@ -1,5 +1,17 @@
 [
   {
+    "id": "server-unplugged-1781116473",
+    "title": "Server Unplugged",
+    "description": "Server was unplegged by mistake.",
+    "severity": "critical",
+    "services": [
+      "home"
+    ],
+    "status": "ongoing",
+    "time": "2026-06-10 18:34:33 UTC",
+    "auto": false
+  },
+  {
     "id": "test-incident-1780843196",
     "title": "Test incident",
     "description": "Test incident. Nothing is actually down. Disregard.",
