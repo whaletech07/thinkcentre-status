@@ -2,7 +2,7 @@
   {
     "id": "server-unplugged-1781116473",
     "title": "Server Unplugged",
-    "description": "Server was unplegged by mistake.",
+    "description": "Server was unplugged by mistake.",
     "severity": "critical",
     "services": [
       "home"
