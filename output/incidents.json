@@ -1,5 +1,17 @@
 [
   {
+    "id": "caddy-down-1781361971",
+    "title": "Caddy Down",
+    "description": "Caddy (my web server and reverse proxy) is not working, leaving many services inaccessible.",
+    "severity": "critical",
+    "services": [
+      "home"
+    ],
+    "status": "ongoing",
+    "time": "2026-06-13 14:46:11 UTC",
+    "auto": false
+  },
+  {
     "id": "server-unplugged-1781116473",
     "title": "Server Unplugged",
     "description": "Server was unplugged by mistake.",
