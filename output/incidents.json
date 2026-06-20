@@ -1,5 +1,17 @@
 [
   {
+    "id": "tools-1781991492",
+    "title": "tools outage",
+    "description": "Service tools went DOWN",
+    "severity": "critical",
+    "services": [
+      "tools"
+    ],
+    "status": "ongoing",
+    "time": "2026-06-20 21:38:12 UTC",
+    "auto": true
+  },
+  {
     "id": "caddy-down-1781361971",
     "title": "Caddy Down",
     "description": "Caddy (my web server and reverse proxy) is not working, leaving many services inaccessible.",
