@@ -1,5 +1,17 @@
 [
   {
+    "id": "internet-down-1783796288",
+    "title": "Internet Down",
+    "description": "Our home internet is currently down.",
+    "severity": "critical",
+    "services": [
+      "home"
+    ],
+    "status": "ongoing",
+    "time": "2026-07-11 18:58:08 UTC",
+    "auto": false
+  },
+  {
     "id": "tools-1781991492",
     "title": "tools outage",
     "description": "Service tools went DOWN",
