@@ -7,7 +7,7 @@
     "services": [
       "navidrome"
     ],
-    "status": "ongoing",
+    "status": "resolved",
     "time": "2026-07-12 23:34:26 UTC",
     "auto": true
   },
@@ -19,7 +19,7 @@
     "services": [
       "mc"
     ],
-    "status": "ongoing",
+    "status": "resolved",
     "time": "2026-07-12 23:34:26 UTC",
     "auto": true
   },
@@ -31,7 +31,7 @@
     "services": [
       "matrix"
     ],
-    "status": "ongoing",
+    "status": "resolved",
     "time": "2026-07-12 23:34:25 UTC",
     "auto": true
   },
@@ -43,7 +43,7 @@
     "services": [
       "mast"
     ],
-    "status": "ongoing",
+    "status": "resolved",
     "time": "2026-07-12 23:34:25 UTC",
     "auto": true
   },
@@ -55,7 +55,7 @@
     "services": [
       "legacy"
     ],
-    "status": "ongoing",
+    "status": "resolved",
     "time": "2026-07-12 23:34:24 UTC",
     "auto": true
   },
@@ -67,7 +67,7 @@
     "services": [
       "git"
     ],
-    "status": "ongoing",
+    "status": "resolved",
     "time": "2026-07-12 23:34:24 UTC",
     "auto": true
   },
@@ -79,7 +79,7 @@
     "services": [
       "files"
     ],
-    "status": "ongoing",
+    "status": "resolved",
     "time": "2026-07-12 23:34:23 UTC",
     "auto": true
   },

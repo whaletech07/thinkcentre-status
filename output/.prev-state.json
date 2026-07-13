@@ -1,14 +1,14 @@
 {
   "dns": "UP",
-  "home": "DOWN",
+  "home": "UP",
   "services": {
-    "mc": "DOWN",
-    "files": "DOWN",
-    "git": "DOWN",
-    "matrix": "DOWN",
-    "mast": "DOWN",
-    "navidrome": "DOWN",
+    "mc": "UP",
+    "files": "UP",
+    "git": "UP",
+    "matrix": "UP",
+    "mast": "UP",
+    "navidrome": "UP",
     "tools": "DOWN",
-    "legacy": "DOWN"
+    "legacy": "UP"
   }
 }
