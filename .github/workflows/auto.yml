@@ -1,9 +1,14 @@
+```yaml
 name: Automatic Status Checker
 
 on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+
+concurrency:
+  group: status-monitor
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -24,115 +29,144 @@ jobs:
 
       - name: Monitor
         env:
-            DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-            RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-            ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
         run: |
           # i have no idea what im doing
-
-          set -euo pipefail # "Remember to set -euo pipefail, because Bash will take any oppourtinuty to delete your whole computer." -some youtuber
+          
+          set -euo pipefail # "Remember to set -euo pipefail, because Bash will take any opportunity to delete your whole computer." -some youtuber idk
 
           notify_discord() {
             local message="$1"
 
             curl -fsS \
-                -H "Content-Type: application/json" \
-                -X POST \
-                -d "$(jq -nc --arg m "$message" '{content:$m}')" \
-                "$DISCORD_WEBHOOK" >/dev/null
-            }
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d "$(jq -nc --arg m "$message" '{content:$m}')" \
+              "$DISCORD_WEBHOOK" >/dev/null || true
+          }
 
-            notify_email() {
+          notify_email() {
             local subject="$1"
             local body="$2"
 
             curl -fsS https://api.resend.com/emails \
-                -H "Authorization: Bearer $RESEND_API_KEY" \
-                -H "Content-Type: application/json" \
-                -d "$(jq -nc \
+              -H "Authorization: Bearer $RESEND_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -nc \
                 --arg from "status@whalete.ch" \
                 --arg to "$ALERT_EMAIL" \
                 --arg subject "$subject" \
                 --arg text "$body" \
                 '{
-                    from:$from,
-                    to:[$to],
-                    subject:$subject,
-                    text:$text
+                  from:$from,
+                  to:[$to],
+                  subject:$subject,
+                  text:$text
                 }'
-                )" >/dev/null
-            }
+              )" >/dev/null || true
+          }
+
+          check() {
+            local code
+
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$1" || echo 000)
+
+            if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then
+              echo "UP"
+            else
+              echo "DOWN"
+            fi
+          }
 
           mkdir -p output
 
-          INCIDENTS=output/incidents.json
+          INCIDENTS="output/incidents.json"
+          PREV_STATE_FILE="output/.prev-state.json"
 
           [ -f "$INCIDENTS" ] || echo "[]" > "$INCIDENTS"
+          [ -f "$PREV_STATE_FILE" ] || echo '{"services":{}}' > "$PREV_STATE_FILE"
 
-          check () {
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$1")
-            [[ "$code" =~ ^[23] ]] && echo "UP" || echo "DOWN"
-          }
+          DNS_IP=$(getent ahosts whaletech07.ddns.net | awk '{print $1; exit}')
 
-          # DNS check
-          DNS_IP=$(nslookup whaletech07.ddns.net 2>/dev/null | awk '/Address: / {print $2}' | tail -n 1)
-          [ -n "$DNS_IP" ] && DNS="UP" || DNS="DOWN"
+          if [ -n "$DNS_IP" ]; then
+            DNS="UP"
+          else
+            DNS="DOWN"
+          fi
 
-          # Home check
           if [ "$DNS" = "UP" ]; then
-            HOME=$(check https://whaletech07.ddns.net/ping)
+            HOME=$(check "https://whaletech07.ddns.net/ping")
           else
             HOME="DOWN"
           fi
 
-          # Services
           if [ "$HOME" = "UP" ]; then
-            MC=$(check https://mc.whalete.ch)
-            FILES=$(check https://files.whalete.ch)
-            GIT=$(check https://git.whalete.ch)
-            MATRIX=$(check https://matrix.whalete.ch)
-            MAST=$(check https://mast.whalete.ch)
-            NAVIDROME=$(check https://navidrome.whalete.ch)
-            TOOLS=$(check https://tools.whalete.ch)
-            LEGACY=$(check https://legacy.whalete.ch)
+            MC=$(check "https://mc.whalete.ch")
+            FILES=$(check "https://files.whalete.ch")
+            GIT=$(check "https://git.whalete.ch")
+            MATRIX=$(check "https://matrix.whalete.ch")
+            MAST=$(check "https://mast.whalete.ch")
+            NAVIDROME=$(check "https://navidrome.whalete.ch")
+            TOOLS=$(check "https://tools.whalete.ch")
+            LEGACY=$(check "https://legacy.whalete.ch")
           else
-            MC=DOWN FILES=DOWN GIT=DOWN MATRIX=DOWN MAST=DOWN NAVIDROME=DOWN TOOLS=DOWN LEGACY=DOWN
+            MC="UNKNOWN"
+            FILES="UNKNOWN"
+            GIT="UNKNOWN"
+            MATRIX="UNKNOWN"
+            MAST="UNKNOWN"
+            NAVIDROME="UNKNOWN"
+            TOOLS="UNKNOWN"
+            LEGACY="UNKNOWN"
           fi
 
-          CURRENT=$(cat <<EOF
-          {
-            "dns": "$DNS",
-            "home": "$HOME",
-            "services": {
-              "mc": "$MC",
-              "files": "$FILES",
-              "git": "$GIT",
-              "matrix": "$MATRIX",
-              "mast": "$MAST",
-              "navidrome": "$NAVIDROME",
-              "tools": "$TOOLS",
-              "legacy": "$LEGACY"
-            }
-          }
-          EOF
+          CURRENT=$(jq -n \
+            --arg dns "$DNS" \
+            --arg home "$HOME" \
+            --arg mc "$MC" \
+            --arg files "$FILES" \
+            --arg git "$GIT" \
+            --arg matrix "$MATRIX" \
+            --arg mast "$MAST" \
+            --arg navidrome "$NAVIDROME" \
+            --arg tools "$TOOLS" \
+            --arg legacy "$LEGACY" \
+            '{
+              services: {
+                dns: $dns,
+                home: $home,
+                mc: $mc,
+                files: $files,
+                git: $git,
+                matrix: $matrix,
+                mast: $mast,
+                navidrome: $navidrome,
+                tools: $tools,
+                legacy: $legacy
+              }
+            }'
           )
-
-          PREV_STATE_FILE="output/.prev-state.json"
-          [ -f "$PREV_STATE_FILE" ] || echo '{"services":{}}' > "$PREV_STATE_FILE"
 
           LAST_DATA=$(cat "$PREV_STATE_FILE")
 
-          for s in $(echo "$CURRENT" | jq -r '.services | keys[]'); do
+          while read -r s; do
 
-            CUR=$(echo "$CURRENT" | jq -r ".services.\"$s\"")
-            PREV=$(echo "$LAST_DATA" | jq -r ".services.\"$s\" // \"UP\"")
+            CUR=$(jq -r ".services.\"$s\"" <<< "$CURRENT")
+            PREV=$(jq -r ".services.\"$s\" // \"UP\"" <<< "$LAST_DATA")
 
-            # If down, create incident.
             if [ "$CUR" = "DOWN" ] && [ "$PREV" != "DOWN" ]; then
 
               ID="$s-$(date -u +%s)"
 
-              jq --arg id "$ID" --arg s "$s" --arg t "$(date -u +"%Y-%m-%d %H:%M:%S UTC")" '
+              TMP=$(mktemp)
+
+              jq \
+                --arg id "$ID" \
+                --arg s "$s" \
+                --arg t "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+                '
                 [{
                   id: $id,
                   title: ($s + " outage"),
@@ -143,22 +177,26 @@ jobs:
                   time: $t,
                   auto: true
                 }] + .
-              ' "$INCIDENTS" > tmp.json && mv tmp.json "$INCIDENTS"
+                ' "$INCIDENTS" > "$TMP"
 
-            MESSAGE="Service $s went DOWN"
+              mv "$TMP" "$INCIDENTS"
 
-            notify_discord "$MESSAGE"
+              MESSAGE="Service $s went DOWN"
 
-            notify_email \
-            "ThinkCentre Alert: $s DOWN" \
-            "$MESSAGE"
+              notify_discord "$MESSAGE"
 
+              notify_email \
+                "ThinkCentre Alert: $s DOWN" \
+                "$MESSAGE"
             fi
 
-            # If up, resolve incident.
             if [ "$CUR" = "UP" ] && [ "$PREV" = "DOWN" ]; then
 
-              jq --arg s "$s" '
+              TMP=$(mktemp)
+
+              jq \
+                --arg s "$s" \
+                '
                 map(
                   if (.services | index($s)) and .status == "ongoing" then
                     .status = "resolved"
@@ -166,19 +204,20 @@ jobs:
                     .
                   end
                 )
-              ' "$INCIDENTS" > tmp.json && mv tmp.json "$INCIDENTS"
+                ' "$INCIDENTS" > "$TMP"
 
-            MESSAGE="Service $s is back UP"
+              mv "$TMP" "$INCIDENTS"
 
-            notify_discord "$MESSAGE"
+              MESSAGE="Service $s is back UP"
 
-            notify_email \
-            "ThinkCentre Alert: $s UP" \
-            "$MESSAGE"
+              notify_discord "$MESSAGE"
 
+              notify_email \
+                "ThinkCentre Alert: $s UP" \
+                "$MESSAGE"
             fi
 
-          done
+          done < <(jq -r '.services | keys[]' <<< "$CURRENT")
 
           echo "$CURRENT" > "$PREV_STATE_FILE"
 
@@ -189,9 +228,10 @@ jobs:
 
           git add output/
 
-          git commit -m "Auto monitoring update" || exit 0
+          git diff --cached --quiet && exit 0
 
-          git fetch origin main
-          git rebase origin/main || true
+          git commit -m "Auto monitoring update"
 
-          git push origin main
+          git pull --rebase origin main
+          git push origin HEAD:main
+```
