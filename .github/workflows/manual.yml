@@ -1,3 +1,4 @@
+```yaml
 name: Incident Editor
 
 on:
@@ -7,10 +8,12 @@ on:
         description: "Create or resolve"
         required: true
         type: choice
-        options: [Create, Resolve]
+        options:
+          - Create
+          - Resolve
 
       id:
-        description: "Incident (resolve)"
+        description: "Incident ID (resolve)"
         required: false
 
       title:
@@ -25,7 +28,9 @@ on:
         description: "Severity"
         required: false
         type: choice
-        options: [degraded, critical]
+        options:
+          - degraded
+          - critical
 
       services:
         description: "Services (comma-separated, create)"
@@ -55,7 +60,7 @@ jobs:
 
       - name: Add/edit incident
         env:
-            DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           set -euo pipefail
 
@@ -63,15 +68,16 @@ jobs:
             local message="$1"
 
             curl -fsS \
-                -H "Content-Type: application/json" \
-                -X POST \
-                -d "$(jq -nc --arg m "$message" '{content:$m}')" \
-                "$DISCORD_WEBHOOK" >/dev/null
-            }
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d "$(jq -nc --arg m "$message" '{content:$m}')" \
+              "$DISCORD_WEBHOOK" >/dev/null || true
+          }
 
-          FILE=output/incidents.json
+          FILE="output/incidents.json"
 
           ACTION="$(echo "${{ github.event.inputs.action }}" | tr '[:upper:]' '[:lower:]')"
+          INCIDENT_ID="${{ github.event.inputs.id }}"
           TITLE="${{ github.event.inputs.title }}"
           DESC="${{ github.event.inputs.description }}"
           SEVERITY="${{ github.event.inputs.severity }}"
@@ -84,20 +90,39 @@ jobs:
               exit 1
             fi
 
-            ID="$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')-$(date -u +%s)"
+            if [ -z "$SEVERITY" ]; then
+              SEVERITY="degraded"
+            fi
+
+            ID="$(echo "$TITLE" \
+              | tr '[:upper:]' '[:lower:]' \
+              | sed 's/[^a-z0-9]/-/g' \
+              | tr -s '-' \
+              | sed 's/^-//;s/-$//')-$(date -u +%s)"
 
             if [ -z "$SERVICES" ]; then
               SERVICES_JSON="[]"
             else
-              SERVICES_JSON=$(echo "$SERVICES" | tr ',' '\n' | jq -R . | jq -s .)
+              SERVICES_JSON=$(
+                echo "$SERVICES" |
+                tr ',' '\n' |
+                sed 's/^ *//;s/ *$//' |
+                sed '/^$/d' |
+                jq -R . |
+                jq -s .
+              )
             fi
 
-            jq --arg id "$ID" \
-               --arg title "$TITLE" \
-               --arg desc "$DESC" \
-               --arg severity "$SEVERITY" \
-               --arg time "$(date -u +"%Y-%m-%d %H:%M:%S UTC")" \
-               --argjson services "$SERVICES_JSON" '
+            TMP=$(mktemp)
+
+            jq \
+              --arg id "$ID" \
+              --arg title "$TITLE" \
+              --arg desc "$DESC" \
+              --arg severity "$SEVERITY" \
+              --arg time "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+              --argjson services "$SERVICES_JSON" \
+              '
               [{
                 id: $id,
                 title: $title,
@@ -108,24 +133,43 @@ jobs:
                 time: $time,
                 auto: false
               }] + .
-            ' "$FILE" > tmp.json && mv tmp.json "$FILE"
+              ' "$FILE" > "$TMP"
 
-            INCIDENT_TITLE=$(
-                jq -r \
-                    --arg id "${{ github.event.inputs.id }}" \
-                    '.[] | select(.id == $id) | .title' \
-                    "$FILE"
-                )
+            mv "$TMP" "$FILE"
 
-            MESSAGE="New incident! '$INCIDENT_TITLE'"
+            MESSAGE="New incident created: $TITLE"
 
             notify_discord "$MESSAGE"
-
           fi
 
           if [ "$ACTION" = "resolve" ]; then
 
-            jq --arg id "${{ github.event.inputs.id }}" '
+            if [ -z "$INCIDENT_ID" ]; then
+              echo "Incident ID is required"
+              exit 1
+            fi
+
+            if ! jq -e \
+              --arg id "$INCIDENT_ID" \
+              '.[] | select(.id == $id)' \
+              "$FILE" >/dev/null; then
+
+              echo "Incident not found: $INCIDENT_ID"
+              exit 1
+            fi
+
+            INCIDENT_TITLE=$(
+              jq -r \
+                --arg id "$INCIDENT_ID" \
+                '.[] | select(.id == $id) | .title' \
+                "$FILE"
+            )
+
+            TMP=$(mktemp)
+
+            jq \
+              --arg id "$INCIDENT_ID" \
+              '
               map(
                 if .id == $id and .status != "resolved" then
                   .status = "resolved"
@@ -133,18 +177,28 @@ jobs:
                   .
                 end
               )
-            ' "$FILE" > tmp.json && mv tmp.json "$FILE"
+              ' "$FILE" > "$TMP"
 
-            MESSAGE="Incident resolved. '$TITLE'"
+            mv "$TMP" "$FILE"
+
+            MESSAGE="Incident resolved: $INCIDENT_TITLE"
 
             notify_discord "$MESSAGE"
-
           fi
 
       - name: Commit
         run: |
+          set -euo pipefail
+
           git config user.name github-actions
           git config user.email github-actions@github.com
+
           git add output/incidents.json
-          git commit -m "Manual incident update" || exit 0
-          git push
+
+          git diff --cached --quiet && exit 0
+
+          git commit -m "Manual incident update"
+
+          git pull --rebase origin main
+          git push origin HEAD:main
+```
