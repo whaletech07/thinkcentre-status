@@ -1,5 +1,17 @@
 [
   {
+    "id": "home-1784823740",
+    "title": "home outage",
+    "description": "Service home went DOWN",
+    "severity": "critical",
+    "services": [
+      "home"
+    ],
+    "status": "ongoing",
+    "time": "2026-07-23T16:22:20Z",
+    "auto": true
+  },
+  {
     "id": "files-1784745852",
     "title": "files outage",
     "description": "Service files went DOWN",
