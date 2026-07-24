@@ -1,5 +1,65 @@
 [
   {
+    "id": "navidrome-1784890081",
+    "title": "navidrome outage",
+    "description": "Service navidrome went DOWN",
+    "severity": "degraded",
+    "services": [
+      "navidrome"
+    ],
+    "status": "ongoing",
+    "time": "2026-07-24T10:48:01Z",
+    "auto": true
+  },
+  {
+    "id": "matrix-1784890080",
+    "title": "matrix outage",
+    "description": "Service matrix went DOWN",
+    "severity": "degraded",
+    "services": [
+      "matrix"
+    ],
+    "status": "ongoing",
+    "time": "2026-07-24T10:48:00Z",
+    "auto": true
+  },
+  {
+    "id": "mast-1784890080",
+    "title": "mast outage",
+    "description": "Service mast went DOWN",
+    "severity": "degraded",
+    "services": [
+      "mast"
+    ],
+    "status": "ongoing",
+    "time": "2026-07-24T10:48:00Z",
+    "auto": true
+  },
+  {
+    "id": "git-1784890079",
+    "title": "git outage",
+    "description": "Service git went DOWN",
+    "severity": "degraded",
+    "services": [
+      "git"
+    ],
+    "status": "ongoing",
+    "time": "2026-07-24T10:47:59Z",
+    "auto": true
+  },
+  {
+    "id": "files-1784890078",
+    "title": "files outage",
+    "description": "Service files went DOWN",
+    "severity": "degraded",
+    "services": [
+      "files"
+    ],
+    "status": "ongoing",
+    "time": "2026-07-24T10:47:58Z",
+    "auto": true
+  },
+  {
     "id": "home-1784823740",
     "title": "home outage",
     "description": "Service home went DOWN",
@@ -7,7 +67,7 @@
     "services": [
       "home"
     ],
-    "status": "ongoing",
+    "status": "resolved",
     "time": "2026-07-23T16:22:20Z",
     "auto": true
   },

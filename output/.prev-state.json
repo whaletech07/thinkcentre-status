@@ -1,13 +1,13 @@
 {
   "services": {
     "dns": "UP",
-    "home": "DOWN",
-    "mc": "UNKNOWN",
-    "files": "UNKNOWN",
-    "git": "UNKNOWN",
-    "matrix": "UNKNOWN",
-    "mast": "UNKNOWN",
-    "navidrome": "UNKNOWN",
-    "legacy": "UNKNOWN"
+    "home": "UP",
+    "mc": "UP",
+    "files": "DOWN",
+    "git": "DOWN",
+    "matrix": "DOWN",
+    "mast": "DOWN",
+    "navidrome": "DOWN",
+    "legacy": "UP"
   }
 }
